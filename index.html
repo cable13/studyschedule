@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMBC Data Catalog Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl">D</div>
+                <span class="font-bold text-xl tracking-tight text-slate-900">Data Catalog</span>
+            </div>
+            <div class="text-sm text-slate-500 hidden sm:block">
+                Auto-syncing via Google Sheets
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Available Projects</h1>
+                <p class="mt-1 text-slate-500">Browse current opportunities loaded directly from the database.</p>
+            </div>
+            
+            <div class="flex space-x-3">
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="Search catalogs..." class="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+                    <svg class="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <select id="categoryFilter" class="border border-slate-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="All">All Categories</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Earth Science">Earth Science</option>
+                    <option value="Data Science">Data Science</option>
+                    <option value="Engineering">Engineering</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="flex justify-center items-center py-20">
+            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </div>
+
+        <div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
+            <!-- Cards will be injected here via JavaScript -->
+        </div>
+
+        <div id="noResults" class="hidden text-center py-20">
+            <h3 class="text-lg font-medium text-slate-900">No projects found</h3>
+            <p class="mt-1 text-slate-500">Try adjusting your search or category filter.</p>
+        </div>
+    </main>
+
+    <script>
+        // Your live Google Sheet CSV Link
+        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTG68pii7gNk_kpbb9b4kKtwiUmYsE7SbeRDM54j1ZnLbnwR7ybpaGnF8fDlgpH6ea-xt1SHUmOZ8WA/pub?output=csv';
+
+        let globalCatalogData = [];
+
+        async function loadCatalogData() {
+            try {
+                Papa.parse(GOOGLE_SHEET_CSV_URL, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        globalCatalogData = results.data;
+                        document.getElementById('loadingIndicator').classList.add('hidden');
+                        document.getElementById('catalogGrid').classList.remove('hidden');
+                        renderCards(globalCatalogData);
+                    },
+                    error: function(error) {
+                        console.error("Error parsing CSV:", error);
+                        alert("Failed to load catalog data. Make sure the Google Sheet is published as CSV.");
+                    }
+                });
+            } catch (error) {
+                console.error("Fetch error:", error);
+            }
+        }
+
+        function renderCards(data) {
+            const grid = document.getElementById('catalogGrid');
+            const noResults = document.getElementById('noResults');
+            grid.innerHTML = '';
+
+            if (data.length === 0) {
+                grid.classList.add('hidden');
+                noResults.classList.remove('hidden');
+                return;
+            } else {
+                grid.classList.remove('hidden');
+                noResults.classList.add('hidden');
+            }
+
+            data.forEach(item => {
+                // Determine badge color based on category
+                let badgeColor = 'bg-slate-100 text-slate-800';
+                if (item.category === 'Computer Science') badgeColor = 'bg-blue-100 text-blue-800';
+                if (item.category === 'Earth Science') badgeColor = 'bg-sky-100 text-sky-800';
+                if (item.category === 'Data Science') badgeColor = 'bg-emerald-100 text-emerald-800';
+                if (item.category === 'Engineering') badgeColor = 'bg-purple-100 text-purple-800';
+
+                const cardHTML = `
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden card-hover flex flex-col h-full">
+                        <img src="${item.image_url}" alt="${item.title}" class="w-full h-48 object-cover border-b border-slate-200" onerror="this.src='https://placehold.co/600x400/e2e8f0/64748b?text=No+Image'">
+                        <div class="p-5 flex flex-col flex-grow">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}">
+                                    ${item.category}
+                                </span>
+                                <span class="text-sm font-semibold text-slate-500">${item.cost}</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-slate-900 mb-2 leading-tight">${item.title}</h3>
+                            <p class="text-sm text-slate-600 mb-4 flex-grow">${item.description}</p>
+                            <button class="w-full bg-slate-900 hover:bg-blue-600 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += cardHTML;
+            });
+        }
+
+        function filterCatalog() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedCategory = document.getElementById('categoryFilter').value;
+
+            const filteredData = globalCatalogData.filter(item => {
+                const matchesSearch = item.title.toLowerCase().includes(searchTerm) || item.description.toLowerCase().includes(searchTerm);
+                const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+                return matchesSearch && matchesCategory;
+            });
+
+            renderCards(filteredData);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', filterCatalog);
+        document.getElementById('categoryFilter').addEventListener('change', filterCatalog);
+
+        // Initialize
+        window.onload = loadCatalogData;
+    </script>
+</body>
+</html>   
