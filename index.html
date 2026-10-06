@@ -1,158 +1,1328 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UMBC Data Catalog Prototype</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fall 2026 Master Schedule & Triple Doomsday Wall Calendar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .font-mono-time {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    /* Custom scrollbar for horizontal tables on small screens */
+    ::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    /* Print-specific rules for plastering on the wall */
+    @media print {
+      @page {
+        size: landscape;
+        margin: 0.35in;
+      }
+      body {
+        background-color: #ffffff !important;
+        font-size: 10pt;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+      .print-avoid-break {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .poster-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+      .schedule-card {
+        box-shadow: none !important;
+        border: 1.5px solid #cbd5e1 !important;
+      }
+    }
+  </style>
 </head>
-<body class="text-slate-800">
 
-    <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl">D</div>
-                <span class="font-bold text-xl tracking-tight text-slate-900">Data Catalog</span>
-            </div>
-            <div class="text-sm text-slate-500 hidden sm:block">
-                Auto-syncing via Google Sheets
-            </div>
+<body class="min-h-screen pb-16">
+
+  <!-- Interactive Control Bar (Hidden when printing for the wall) -->
+  <header class="no-print sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md text-white border-b border-slate-800 shadow-lg">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-rose-600 flex items-center justify-center font-black text-lg tracking-tighter shadow-inner">
+          A+
         </div>
-    </nav>
+        <div>
+          <h1 class="font-bold text-sm sm:text-base leading-tight">Fall 2026 Wall Calendar & Doomsday Study System</h1>
+          <p class="text-xs text-slate-400">Mon, Oct 5 – Sun, Nov 8, 2026 • UMBC (STAT 355 • CMSC 202 • MATH 251 • iHARP)</p>
+        </div>
+      </div>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="mb-8 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-900">Available Projects</h1>
-                <p class="mt-1 text-slate-500">Browse current opportunities loaded directly from the database.</p>
+      <!-- Subject Highlight Filter -->
+      <div class="flex flex-wrap items-center gap-1.5 bg-slate-800 p-1 rounded-xl border border-slate-700">
+        <button onclick="filterCourse('all')" id="btn-all" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition">
+          All Blocks
+        </button>
+        <button onclick="filterCourse('locked')" id="btn-locked" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition">
+          🔒 Non-Negotiables
+        </button>
+        <button onclick="filterCourse('cmsc')" id="btn-cmsc" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-300 hover:bg-indigo-950/60 transition">
+          💻 CMSC 202
+        </button>
+        <button onclick="filterCourse('math')" id="btn-math" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-300 hover:bg-amber-950/60 transition">
+          📐 MATH 251
+        </button>
+        <button onclick="filterCourse('stat')" id="btn-stat" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 hover:bg-emerald-950/60 transition">
+          📊 STAT 355
+        </button>
+        <button onclick="filterCourse('iharp')" id="btn-iharp" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-300 hover:bg-purple-950/60 transition">
+          🔬 iHARP Research
+        </button>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2">
+        <button onclick="resetCheckboxes()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition">
+          Reset Checks
+        </button>
+        <button onclick="window.print()" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-bold shadow-md flex items-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+          Print Wall Poster
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="poster-container max-w-[1600px] mx-auto px-3 sm:px-6 pt-6 space-y-8">
+
+    <!-- SHEET 1 HEADER: Poster Title & Triple Doomsday Banner -->
+    <section class="schedule-card bg-white rounded-2xl border-2 border-slate-300 shadow-sm p-5 sm:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b-2 border-slate-200">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold mb-2">
+            <span>✅ STATUS: Project 2 (+ Extra Credit) & Prelab Quiz 6 Submitted Early!</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            FALL 2026 MASTER WEEKLY SCHEDULE & "GUARANTEE AN A" WALL PLANNER
+          </h2>
+          <p class="text-sm text-slate-600 mt-1 font-medium">
+            Non-Negotiable UMBC Classes, Labs & Monday iHARP Meetings Locked 🔒 • Color-Coded Study Blocks Engineered for 90%+ (A) on All 3 Exams
+          </p>
+        </div>
+
+        <!-- Legend Box -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-bold bg-slate-50 p-3 rounded-xl border border-slate-200 shrink-0">
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-slate-900 inline-block"></span> 🔒 Locked Class/Mtg</div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-indigo-600 inline-block"></span> 💻 CMSC 202 (C++)</div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-amber-500 inline-block"></span> 📐 MATH 251 (Calc 3)</div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-emerald-600 inline-block"></span> 📊 STAT 355 (Stats)</div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-purple-600 inline-block"></span> 🔬 iHARP Research</div>
+          <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded bg-rose-600 inline-block"></span> 🚨 Exam / Deadline</div>
+        </div>
+      </div>
+
+      <!-- Triple Doomsday Target Box -->
+      <div class="mt-4 bg-rose-50/90 border-2 border-rose-500 rounded-xl p-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded bg-rose-600 text-white font-black text-xs uppercase tracking-wider">Target Day</span>
+            <h3 class="text-base sm:text-lg font-black text-rose-950">
+              THURSDAY, NOVEMBER 5, 2026 — "TRIPLE DOOMSDAY" EXAM SCHEDULE
+            </h3>
+          </div>
+          <span class="text-xs font-bold text-rose-800 bg-rose-100 px-3 py-1 rounded-lg border border-rose-300">
+            Goal: 90%+ (A) on All 3 Back-to-Back Exams + Project 3 Done Oct 21 + Project 4 50% Pre-Built
+          </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="bg-white rounded-lg p-3 border-l-4 border-emerald-600 shadow-sm border border-rose-200">
+            <div class="flex justify-between items-center text-xs font-mono-time font-bold text-emerald-800">
+              <span>11:30 AM – 12:45 PM</span>
+              <span class="bg-emerald-100 px-2 py-0.5 rounded">PAH 132</span>
             </div>
+            <div class="font-extrabold text-sm text-slate-900 mt-1">📊 STAT 355 — Exam 2 (Ch. 5 to Ch. 8)</div>
+            <p class="text-xs text-slate-600 mt-0.5">Joint RVs, Point Est, CIs, Hypothesis Tests (Z & t). Formula/table sheet + calculator.</p>
+          </div>
+          <div class="bg-white rounded-lg p-3 border-l-4 border-indigo-600 shadow-sm border border-rose-200">
+            <div class="flex justify-between items-center text-xs font-mono-time font-bold text-indigo-800">
+              <span>1:00 PM – 2:15 PM</span>
+              <span class="bg-indigo-100 px-2 py-0.5 rounded">ITE 102</span>
+            </div>
+            <div class="font-extrabold text-sm text-slate-900 mt-1">💻 CMSC 202 — Exam 2 (150 pts / 15%)</div>
+            <p class="text-xs text-slate-600 mt-0.5">Lec 1–18 (Pointers, Dynamic Memory, Destructors, Linked Lists, Overloading, Inheritance).</p>
+          </div>
+          <div class="bg-white rounded-lg p-3 border-l-4 border-amber-500 shadow-sm border border-rose-200">
+            <div class="flex justify-between items-center text-xs font-mono-time font-bold text-amber-800">
+              <span>4:00 PM – 5:15 PM</span>
+              <span class="bg-amber-100 px-2 py-0.5 rounded">PUP 105</span>
+            </div>
+            <div class="font-extrabold text-sm text-slate-900 mt-1">📐 MATH 251 — Midterm 2 (20% of Grade)</div>
+            <p class="text-xs text-slate-600 mt-0.5">50 mins; strictly NO books, notes, or calculators. Partial derivatives, optimization, integrals.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHEET 1 MAIN: 7-DAY WEEKLY MASTER TIME-BLOCK CALENDAR (Matches uploaded PDF Schedule) -->
+    <section class="schedule-card bg-white rounded-2xl border-2 border-slate-300 shadow-sm overflow-hidden">
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-lg font-black tracking-tight uppercase">Part 1: Weekly Master Time-Block Wall Grid (Monday – Sunday)</h3>
+          <p class="text-xs text-slate-300">Exact time slots from your Master Schedule PDF with non-negotiable classes/meetings locked and study blocks optimized</p>
+        </div>
+        <span class="text-xs font-mono-time bg-slate-800 px-3 py-1 rounded border border-slate-700 text-emerald-300">
+          Every Study Block = Active Problem Solving (No Passive Reading)
+        </span>
+      </div>
+
+      <!-- 7-Column Calendar Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300">
+
+        <!-- ================= MONDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-purple-300">Research & Prep</div>
+            <div class="text-lg font-black">MONDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
             
-            <div class="flex space-x-3">
-                <div class="relative">
-                    <input type="text" id="searchInput" placeholder="Search catalogs..." class="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-                    <svg class="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <select id="categoryFilter" class="border border-slate-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="All">All Categories</option>
-                    <option value="Computer Science">Computer Science</option>
-                    <option value="Earth Science">Earth Science</option>
-                    <option value="Data Science">Data Science</option>
-                    <option value="Engineering">Engineering</option>
-                </select>
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">7:00 AM – 8:30 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Morning & 📊 STAT 355 Formula Review</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Breakfast + 45-min review of last week's STAT 355 theorems & Z/t-table rules.</p>
             </div>
+
+            <div class="course-block bg-purple-50 border-l-4 border-purple-600 rounded-lg p-2.5 border border-purple-200 shadow-sm" data-course="iharp cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-purple-800">9:00 AM – 10:00 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">🔬 iHARP Prep & Prelab Check</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Verify CMSC 202 Prelab Quiz is submitted (Due 10am!) + prep slides/notes for Prof. Xu.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-purple-400 rounded-lg p-2.5 shadow-md" data-course="locked iharp">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-purple-300">10:00 AM – 11:00 AM</span>
+                <span class="text-[10px] font-black bg-purple-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">🔬 iHARP Mtg w/ Prof. Xu</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">NON-NEGOTIABLE — Weekly faculty research meeting.</p>
+            </div>
+
+            <div class="course-block bg-purple-50 border-l-4 border-purple-600 rounded-lg p-2.5 border border-purple-200 shadow-sm" data-course="iharp">
+              <div class="font-mono-time text-[11px] font-bold text-purple-800">11:00 AM – 12:00 PM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">🔬 Post-Mtg Action Log</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Translate Prof. Xu's feedback into concrete coding/experiment tasks while fresh.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">12:00 PM – 1:00 PM</div>
+              <div class="font-bold text-xs text-slate-800">Lunch & Screen Reset</div>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-purple-400 rounded-lg p-2.5 shadow-md" data-course="locked iharp">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-purple-300">1:00 PM – 3:00 PM</span>
+                <span class="text-[10px] font-black bg-purple-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">🔬 1:30 PM Dr. Josephine Sync</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">NON-NEGOTIABLE — Sync meeting + execute 60 mins of research pipeline work.</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">3:00 PM – 4:30 PM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📐 MATH 251 Study Block 1</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Pre-lecture reading + solve 5 closed-book problems for Tuesday's 6:00 PM Discussion Quiz.</p>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">5:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 STAT 355 HW + 💻 202 Skim</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">60-min WebAssign HW drill + 20-min preview of Tuesday's CMSC 202 lecture slides + Rest.</p>
+            </div>
+
+          </div>
         </div>
 
-        <div id="loadingIndicator" class="flex justify-center items-center py-20">
-            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <!-- ================= TUESDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-amber-300">Full Campus Day</div>
+            <div class="text-lg font-black">TUESDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">7:30 AM – 9:00 AM</div>
+              <div class="font-bold text-xs text-slate-800">Morning Routine & Commute</div>
+              <p class="text-[11px] text-slate-500">Drive to UMBC; pack lunch & water.</p>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">9:30 AM – 10:30 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 STAT 355 On-Campus Drill</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Library/Retriever Learning Center: 60-min practice problems before lecture/quiz.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-emerald-400 rounded-lg p-2.5 shadow-md" data-course="locked stat">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-emerald-300">11:30 AM – 12:45 PM</span>
+                <span class="text-[10px] font-black bg-emerald-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📊 STAT 355 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Performing Arts & Humanities 132</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-indigo-400 rounded-lg p-2.5 shadow-md" data-course="locked cmsc">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-indigo-300">1:00 PM – 2:15 PM</span>
+                <span class="text-[10px] font-black bg-indigo-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">💻 CMSC 202 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Information Technology 102</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-indigo-400 rounded-lg p-2.5 shadow-md" data-course="locked cmsc">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-indigo-300">2:30 PM – 3:20 PM</span>
+                <span class="text-[10px] font-black bg-indigo-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">💻 CMSC 202 [DIS / LAB]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Engineering 104A — Finish & submit lab in class!</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2 border border-amber-200" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">3:20 PM – 4:00 PM</div>
+              <div class="font-bold text-xs text-slate-900">Snack & 📐 MATH 251 Skim</div>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-amber-400 rounded-lg p-2.5 shadow-md" data-course="locked math">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-amber-300">4:00 PM – 5:15 PM</span>
+                <span class="text-[10px] font-black bg-amber-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📐 MATH 251 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Public Policy 105</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">5:15 PM – 6:00 PM</div>
+              <div class="font-bold text-xs text-slate-900">📐 Pre-Discussion Quiz Sprint</div>
+              <p class="text-[11px] text-slate-600 leading-snug">3 closed-book problems in Sondheim before 6pm quiz.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-amber-400 rounded-lg p-2.5 shadow-md" data-course="locked math">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-amber-300">6:00 PM – 6:50 PM</span>
+                <span class="text-[10px] font-black bg-amber-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📐 MATH 251 [DIS — QUIZ]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Sondheim 406 — Weekly Graded Quiz/Activity</p>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2 border border-indigo-200" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">7:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900">Commute Home & 24-Hr Rule</div>
+              <p class="text-[11px] text-slate-600 leading-snug">Read new CMSC 202 Project spec on release nights; otherwise full rest.</p>
+            </div>
+
+          </div>
         </div>
 
-        <div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
-            <!-- Cards will be injected here via JavaScript -->
+        <!-- ================= WEDNESDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-indigo-300">Deep Work Day 1</div>
+            <div class="text-lg font-black">WEDNESDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">7:00 AM – 8:30 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Morning & 📐 MATH 251 Recall</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Write out Tuesday's Calc 3 definitions & theorems from memory on blank paper.</p>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">9:00 AM – 10:30 AM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">💻 CMSC 202 Deep Sprint 1A</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Build Project 3 / Project 4 classes + run <code class="bg-indigo-100 px-1 rounded">valgrind</code> + trace Linked List pointers by hand.</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">10:30 AM – 12:00 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📐 MATH 251 Deep Sprint 1B</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Solve 6–8 suggested textbook / Achieve problems with ZERO notes or calculator.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">12:00 PM – 1:00 PM</div>
+              <div class="font-bold text-xs text-slate-800">Lunch & Walk Break</div>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">1:00 PM – 3:00 PM (2h)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 STAT 355 Mastery Block</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Finish WebAssign HW + drill practice problems for Thursday's STAT 355 Quiz.</p>
+            </div>
+
+            <div class="course-block bg-purple-50 border-l-4 border-purple-600 rounded-lg p-2.5 border border-purple-200 shadow-sm" data-course="iharp">
+              <div class="font-mono-time text-[11px] font-bold text-purple-800">3:00 PM – 4:30 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">🔬 iHARP Research Block 1</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Dedicated execution of Prof. Xu & Dr. Josephine deliverables (keeps weekends free!).</p>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc stat">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">5:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">💻 202 Worksheet + Evening Off</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">45-min CMSC 202 Exam 2 Review Worksheet practice + Dinner & Rest.</p>
+            </div>
+
+          </div>
         </div>
 
-        <div id="noResults" class="hidden text-center py-20">
-            <h3 class="text-lg font-medium text-slate-900">No projects found</h3>
-            <p class="mt-1 text-slate-500">Try adjusting your search or category filter.</p>
+        <!-- ================= THURSDAY ================= -->
+        <div class="flex flex-col bg-rose-50/20">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-rose-300">Campus & Exam Anchor</div>
+            <div class="text-lg font-black">THURSDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">6:30 AM – 8:00 AM</div>
+              <div class="font-bold text-xs text-slate-800">Early Routine & Commute</div>
+              <p class="text-[11px] text-slate-500">Arrive at UMBC by 8:30 AM for 9am Discussion.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-emerald-400 rounded-lg p-2.5 shadow-md" data-course="locked stat">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-emerald-300">9:00 AM – 9:50 AM</span>
+                <span class="text-[10px] font-black bg-emerald-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📊 STAT 355 [DIS]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Math & Psychology 104 — Ask TA any HW/Quiz Qs</p>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">10:00 AM – 11:30 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 STAT 355 Pre-Lecture Drill</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Timed quiz/exam warm-up problems right before 11:30 AM lecture.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-emerald-400 rounded-lg p-2.5 shadow-md" data-course="locked stat">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-emerald-300">11:30 AM – 12:45 PM</span>
+                <span class="text-[10px] font-black bg-emerald-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📊 STAT 355 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">PAH 132 *(Nov 5: STAT 355 EXAM 2)*</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-indigo-400 rounded-lg p-2.5 shadow-md" data-course="locked cmsc">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-indigo-300">1:00 PM – 2:15 PM</span>
+                <span class="text-[10px] font-black bg-indigo-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">💻 CMSC 202 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">ITE 102 *(Nov 5: CMSC 202 EXAM 2)*</p>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc math">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">2:15 PM – 4:00 PM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Lunch + 💻 202 / 📐 251 Office Hrs</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">60m CMSC 202 Project coding (24-Hr Rule) or TA Office Hours + 30m Calc 3 prep.</p>
+            </div>
+
+            <div class="course-block bg-slate-900 text-white border-l-4 border-amber-400 rounded-lg p-2.5 shadow-md" data-course="locked math">
+              <div class="flex items-center justify-between">
+                <span class="font-mono-time text-[11px] font-bold text-amber-300">4:00 PM – 5:15 PM</span>
+                <span class="text-[10px] font-black bg-amber-600 px-1.5 py-0.5 rounded uppercase">🔒 Locked</span>
+              </div>
+              <div class="font-extrabold text-xs mt-1">📐 MATH 251 [LEC]</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Public Policy 105 *(Nov 5: MIDTERM 2)*</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">5:30 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Commute + 📐 45m Calc 3 Recap</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Drive home, dinner, and rework Thursday's Calc 3 lecture examples from scratch.</p>
+            </div>
+
+          </div>
         </div>
-    </main>
 
-    <script>
-        // Your live Google Sheet CSV Link
-        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTG68pii7gNk_kpbb9b4kKtwiUmYsE7SbeRDM54j1ZnLbnwR7ybpaGnF8fDlgpH6ea-xt1SHUmOZ8WA/pub?output=csv';
+        <!-- ================= FRIDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-emerald-300">Deep Work Day 2</div>
+            <div class="text-lg font-black">FRIDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
 
-        let globalCatalogData = [];
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">7:00 AM – 8:30 AM</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Morning & 💻 C++ Hand-Tracing</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Practice writing C++ destructors, copy constructors & linked list functions on paper.</p>
+            </div>
 
-        async function loadCatalogData() {
-            try {
-                Papa.parse(GOOGLE_SHEET_CSV_URL, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        globalCatalogData = results.data;
-                        document.getElementById('loadingIndicator').classList.add('hidden');
-                        document.getElementById('catalogGrid').classList.remove('hidden');
-                        renderCards(globalCatalogData);
-                    },
-                    error: function(error) {
-                        console.error("Error parsing CSV:", error);
-                        alert("Failed to load catalog data. Make sure the Google Sheet is published as CSV.");
-                    }
-                });
-            } catch (error) {
-                console.error("Fetch error:", error);
-            }
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">9:00 AM – 10:30 AM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">💻 Prelab Quiz + Project Sprint 2A</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug"><strong>9:00 AM:</strong> Take Blackboard Prelab Quiz immediately! Then 75m Project 3/4 coding.</p>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">10:30 AM – 12:00 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 STAT 355 Deep Sprint 2B</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Update Exam 2 Master Formula Sheet (Ch. 5–8) + solve 6 multi-part exam problems.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">12:00 PM – 1:00 PM</div>
+              <div class="font-bold text-xs text-slate-800">Lunch & Reset</div>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">1:00 PM – 3:00 PM (2h)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📐 MATH 251 Mastery Block</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Complete weekly Achieve + drill chain rule, gradients, tangent planes & extrema.</p>
+            </div>
+
+            <div class="course-block bg-purple-50 border-l-4 border-purple-600 rounded-lg p-2.5 border border-purple-200 shadow-sm" data-course="iharp">
+              <div class="font-mono-time text-[11px] font-bold text-purple-800">3:00 PM – 4:30 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">🔬 iHARP Research Block 2</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Run experiments & update charts/slides for Monday's meetings.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-500 rounded-lg p-2.5 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-700">5:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Weekly Desk Reset & Friday Night Off</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Organize notes & recharge completely.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================= SATURDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-sky-300">Project & Flex Day</div>
+            <div class="text-lg font-black">SATURDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2.5 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">8:00 AM – 10:00 AM</div>
+              <div class="font-bold text-xs text-slate-800">Sleep In & Recovery Morning</div>
+            </div>
+
+            <div class="course-block bg-purple-50 border-l-4 border-purple-600 rounded-lg p-2.5 border border-purple-200 shadow-sm" data-course="iharp">
+              <div class="font-mono-time text-[11px] font-bold text-purple-800">10:00 AM – 12:00 PM (2h)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">🔬 iHARP Weekly Finish Line</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Finalize all Prof. Xu & Dr. Josephine deliverables so Sunday has ZERO research stress.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">12:00 PM – 1:00 PM</div>
+              <div class="font-bold text-xs text-slate-800">Lunch Break</div>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">1:00 PM – 3:00 PM (2h)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">💻 CMSC 202 Heavy Build Block</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Complete major Project 3 / Project 4 milestones + edge-case testing & Valgrind check.</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math stat">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">3:00 PM – 4:30 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📐/📊 Weak-Spot Patching Block</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Re-solve any flagged problems from the week in MATH 251 or STAT 355 until 100% fluent.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-500 rounded-lg p-2.5 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-700">5:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Saturday Evening Off!</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Social time, hobbies, and full mental reset.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================= SUNDAY ================= -->
+        <div class="flex flex-col bg-slate-50/40">
+          <div class="bg-slate-800 text-white p-3 text-center border-b-2 border-slate-300">
+            <div class="text-xs font-bold uppercase tracking-widest text-rose-300">Mock Exam Drills</div>
+            <div class="text-lg font-black">SUNDAY</div>
+          </div>
+          <div class="p-2.5 space-y-2.5 flex-1">
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-400 rounded-lg p-2.5 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-600">8:30 AM – 1:00 PM</div>
+              <div class="font-bold text-xs text-slate-800">Rest, Meal Prep & Lunch</div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Recharge & prep meals for Tuesday/Thursday campus days.</p>
+            </div>
+
+            <div class="course-block bg-indigo-50 border-l-4 border-indigo-600 rounded-lg p-2.5 border border-indigo-200 shadow-sm" data-course="cmsc">
+              <div class="font-mono-time text-[11px] font-bold text-indigo-800">1:00 PM – 2:30 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">💻 Sunday Triple-Threat 1: CMSC 202</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Timed blank Exam 2 Review Worksheet run (hand-written C++ code, no IDE!) + grade against key.</p>
+            </div>
+
+            <div class="course-block bg-amber-50 border-l-4 border-amber-500 rounded-lg p-2.5 border border-amber-200 shadow-sm" data-course="math">
+              <div class="font-mono-time text-[11px] font-bold text-amber-900">2:30 PM – 4:00 PM (90m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📐 Sunday Triple-Threat 2: MATH 251</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">50-minute closed-book timed mock test + 40-minute error log & redoing missed steps.</p>
+            </div>
+
+            <div class="course-block bg-emerald-50 border-l-4 border-emerald-600 rounded-lg p-2.5 border border-emerald-200 shadow-sm" data-course="stat">
+              <div class="font-mono-time text-[11px] font-bold text-emerald-800">4:00 PM – 5:00 PM (60m)</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">📊 Sunday Triple-Threat 3: STAT 355</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Timed 5-problem quiz/exam simulation using only your formula sheet & calculator.</p>
+            </div>
+
+            <div class="course-block bg-slate-100 border-l-4 border-slate-500 rounded-lg p-2.5 border border-slate-200" data-course="all">
+              <div class="font-mono-time text-[11px] font-bold text-slate-700">5:00 PM onwards</div>
+              <div class="font-bold text-xs text-slate-900 mt-0.5">Full Evening Off & Early Sleep</div>
+              <p class="text-[11px] text-slate-600 mt-1 leading-snug">Pack bag for Monday morning; lights out early.</p>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SHEET 2: 35-DAY WALL CALENDAR COUNTDOWN (OCT 5 – NOV 8, 2026) -->
+    <section class="print-page-break schedule-card bg-white rounded-2xl border-2 border-slate-300 shadow-sm overflow-hidden">
+      <div class="bg-slate-900 text-white px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="text-[11px] font-mono-time uppercase tracking-widest text-rose-400 font-bold">Sheet 2 • Plaster on Wall & Cross Off Each Day</span>
+          <h3 class="text-xl font-black tracking-tight uppercase">
+            Part 2: 35-Day Wall Calendar Countdown to Triple Doomsday (Oct 5 – Nov 8, 2026)
+          </h3>
+        </div>
+        <div class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+          💡 <strong>Tip:</strong> Click any checkbox on screen (saved automatically) or cross off each box with a marker on your wall!
+        </div>
+      </div>
+
+      <!-- Calendar Header Row (Mon - Sun) -->
+      <div class="grid grid-cols-1 lg:grid-cols-7 bg-slate-100 border-b-2 border-slate-300 text-center font-black text-xs uppercase tracking-wider text-slate-700 hidden lg:grid">
+        <div class="py-2.5 border-r border-slate-300">Monday</div>
+        <div class="py-2.5 border-r border-slate-300">Tuesday</div>
+        <div class="py-2.5 border-r border-slate-300">Wednesday</div>
+        <div class="py-2.5 border-r border-slate-300">Thursday</div>
+        <div class="py-2.5 border-r border-slate-300">Friday</div>
+        <div class="py-2.5 border-r border-slate-300">Saturday</div>
+        <div class="py-2.5">Sunday</div>
+      </div>
+
+      <!-- ================= WEEK 1: OCT 5 – OCT 11 ================= -->
+      <div class="bg-indigo-950 text-white px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider flex justify-between items-center">
+        <span>WEEK 1 (Course Week 7): Oct 5 – Oct 11 • Project 3 Launch, STAT 355 Ch. 5 & Calc 3 Foundations</span>
+        <span class="font-mono-time text-indigo-300">30 Days to Doomsday</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300 border-b-2 border-slate-300">
+        
+        <!-- Mon Oct 5 -->
+        <div class="p-3 bg-emerald-50/40 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Mon, Oct 5</span>
+              <span class="text-[10px] font-bold bg-emerald-200 text-emerald-950 px-1.5 py-0.5 rounded">TODAY</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct5-1" checked class="mt-0.5 rounded text-emerald-600"> <span class="line-through text-slate-500"><strong>CMSC 202:</strong> Proj 2 + Prelab Done!</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct5-2" class="mt-0.5 rounded"> <span><strong>🔒 10am & 1:30pm:</strong> iHARP Mtgs</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct5-3" class="mt-0.5 rounded"> <span><strong>MATH 251:</strong> 5 closed-book probs for Tue Quiz</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct5-4" class="mt-0.5 rounded"> <span><strong>STAT 355:</strong> Drill Sec 4.3 & 4.6 for Quiz-5</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tue Oct 6 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Tue, Oct 6</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PROJ 3 DROPS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct6-1" class="mt-0.5 rounded"> <span><strong>📊 STAT 355:</strong> Quiz-5 (4.3 & 4.6) + Lec 5.1–5.2</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct6-2" class="mt-0.5 rounded"> <span><strong>💻 CMSC 202:</strong> Lec 12 (Linked Lists) + Lab 6</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct6-3" class="mt-0.5 rounded"> <span><strong>📐 MATH 251:</strong> Lec + 6pm Discussion Quiz</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct6-4" class="mt-0.5 rounded"> <span><strong>💻 7pm:</strong> Read Project 3 Spec</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wed Oct 7 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Wed, Oct 7</span>
+              <span class="text-[10px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded">24-HR RULE</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct7-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Stub Proj 3 headers, Makefile & main</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct7-2" class="mt-0.5 rounded"> <span><strong>📐 10:30am:</strong> Calc 3 problem set (6 probs)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct7-3" class="mt-0.5 rounded"> <span><strong>📊 1:00pm:</strong> Start HW-6 (Joint RVs 5.1–5.2)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct7-4" class="mt-0.5 rounded"> <span><strong>🔬 3:00pm:</strong> iHARP Research Block 1</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thu Oct 8 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Thu, Oct 8</span>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">CAMPUS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct8-1" class="mt-0.5 rounded"> <span><strong>📊 9am & 11:30am:</strong> STAT Dis + Lec (5.3–5.5)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct8-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> CMSC 202 Lec 13</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct8-3" class="mt-0.5 rounded"> <span><strong>💻 2:15pm:</strong> Code Proj 3 Node/List constructors</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct8-4" class="mt-0.5 rounded"> <span><strong>📐 4:00pm:</strong> MATH 251 Lec + Evening review</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fri Oct 9 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Fri, Oct 9</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PRELAB 7</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct9-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Prelab 7 Quiz + Proj 3 Insert/Delete</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct9-2" class="mt-0.5 rounded"> <span><strong>📊 10:30am:</strong> Finish STAT HW-6 (5.1–5.3)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct9-3" class="mt-0.5 rounded"> <span><strong>📐 1:00pm:</strong> Calc 3 Achieve + closed-book drill</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct9-4" class="mt-0.5 rounded"> <span><strong>🔬 3:00pm:</strong> iHARP Research Block 2</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sat Oct 10 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sat, Oct 10</span>
+              <span class="text-[10px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded">BUILD DAY</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct10-1" class="mt-0.5 rounded"> <span><strong>🔬 10:00am:</strong> Finish weekly iHARP tasks</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct10-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Reach 40% Project 3 + Valgrind test</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct10-3" class="mt-0.5 rounded"> <span><strong>📐/📊 3:00pm:</strong> Patch Week 1 weak problems</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sun Oct 11 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sun, Oct 11</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">TRIPLE DRILL</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct11-1" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Exam 2 Wksht: Pointers & Dynamic Mem</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct11-2" class="mt-0.5 rounded"> <span><strong>📐 2:30pm:</strong> 50-min closed-book Calc 3 drill</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct11-3" class="mt-0.5 rounded"> <span><strong>📊 4:00pm:</strong> Drill Ch. 5 Sample Mean/Linear Comb</span></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= WEEK 2: OCT 12 – OCT 18 (FALL RECESS) ================= -->
+      <div class="bg-indigo-950 text-white px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider flex justify-between items-center">
+        <span>WEEK 2 (Course Week 8 — FALL RECESS): Oct 12 – Oct 18 • 75% Project 3 Push & Quiz-6 / HW-6</span>
+        <span class="font-mono-time text-indigo-300">23 Days to Doomsday</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300 border-b-2 border-slate-300">
+        
+        <!-- Mon Oct 12 -->
+        <div class="p-3 bg-sky-50/50 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Mon, Oct 12</span>
+              <span class="text-[10px] font-bold bg-sky-200 text-sky-950 px-1.5 py-0.5 rounded">FALL BREAK</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct12-1" class="mt-0.5 rounded"> <span><strong>💻 By 10am:</strong> Ensure Prelab 7 Quiz is in!</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct12-2" class="mt-0.5 rounded"> <span><strong>🔒 10am & 1:30pm:</strong> iHARP Mtgs (if held)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct12-3" class="mt-0.5 rounded"> <span><strong>💻 3:00pm:</strong> Complete Online Lab 7 + Proj 3</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct12-4" class="mt-0.5 rounded"> <span><strong>📐 5:00pm:</strong> 60m Calc 3 Midterm 2 topic review</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tue Oct 13 -->
+        <div class="p-3 bg-sky-50/50 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Tue, Oct 13</span>
+              <span class="text-[10px] font-bold bg-sky-200 text-sky-950 px-1.5 py-0.5 rounded">NO CLASSES</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct13-1" class="mt-0.5 rounded"> <span><strong>💻 9am–12pm:</strong> Heavy Project 3 Sprint (Hit 75%!)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct13-2" class="mt-0.5 rounded"> <span><strong>📐 1:30–3:30pm:</strong> Calc 3 Multi-section problem drill</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct13-3" class="mt-0.5 rounded"> <span><strong>📊 3:30–5:00pm:</strong> STAT 355 Quiz-6 prep (5.1–5.4)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wed Oct 14 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Wed, Oct 14</span>
+              <span class="text-[10px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded">DEEP WORK</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct14-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Proj 3 Valgrind memory leak debugging</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct14-2" class="mt-0.5 rounded"> <span><strong>📐 10:30am:</strong> Pre-read Thursday Calc 3 + 5 probs</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct14-3" class="mt-0.5 rounded"> <span><strong>📊 1:00pm:</strong> Finalize HW-6 & mock Quiz-6</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct14-4" class="mt-0.5 rounded"> <span><strong>🔬 3:00pm:</strong> iHARP Research Block 1</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thu Oct 15 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Thu, Oct 15</span>
+              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded">QUIZ-6 & HW-6</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct15-1" class="mt-0.5 rounded"> <span><strong>📊 STAT 355:</strong> Quiz-6 (5.1–5.4) + HW-6 Due + Ch 6/7.1</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct15-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> CMSC 202 Lec (Overloaded Ops)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct15-3" class="mt-0.5 rounded"> <span><strong>💻 2:15pm:</strong> Reach 90% Project 3 completion</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct15-4" class="mt-0.5 rounded"> <span><strong>📐 4:00pm:</strong> MATH 251 Lecture + recap</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fri Oct 16 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Fri, Oct 16</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PRELAB 8</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct16-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Prelab 8 Quiz + Proj 3 full test suite</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct16-2" class="mt-0.5 rounded"> <span><strong>📊 10:30am:</strong> Start HW-7 (Sec 5.4 – 7.1 CIs)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct16-3" class="mt-0.5 rounded"> <span><strong>📐 1:00pm:</strong> 2h Calc 3 problem drill</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct16-4" class="mt-0.5 rounded"> <span><strong>🔬 3:00pm:</strong> iHARP Research Block 2</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sat Oct 17 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sat, Oct 17</span>
+              <span class="text-[10px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded">POLISH PROJ 3</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct17-1" class="mt-0.5 rounded"> <span><strong>🔬 10:00am:</strong> Finish weekly iHARP deliverables</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct17-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Project 3 Coding Standards & Valgrind</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct17-3" class="mt-0.5 rounded"> <span><strong>📊 3:00pm:</strong> Point Estimation & CI derivations</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sun Oct 18 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sun, Oct 18</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">TRIPLE DRILL</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct18-1" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Exam 2 Wksht Part 1 (Linked Lists/Make)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct18-2" class="mt-0.5 rounded"> <span><strong>📐 2:30pm:</strong> 50-min closed-book Calc 3 test</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct18-3" class="mt-0.5 rounded"> <span><strong>📊 4:00pm:</strong> Timed Ch. 5–6 problem set</span></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= WEEK 3: OCT 19 – OCT 25 (2-WEEK COUNTDOWN) ================= -->
+      <div class="bg-indigo-950 text-white px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider flex justify-between items-center">
+        <span>WEEK 3 (Course Week 9 — 2-WEEK EXAM COUNTDOWN): Oct 19 – Oct 25 • Submit Project 3 Early (Oct 21)!</span>
+        <span class="font-mono-time text-amber-300">16 Days to Doomsday</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300 border-b-2 border-slate-300">
+        
+        <!-- Mon Oct 19 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Mon, Oct 19</span>
+              <span class="text-[10px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded">iHARP MTGS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct19-1" class="mt-0.5 rounded"> <span><strong>🔒 10am & 1:30pm:</strong> Prof. Xu & Dr. Josephine Mtgs</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct19-2" class="mt-0.5 rounded"> <span><strong>📐 3:00pm:</strong> 5 closed-book probs for Tue Quiz</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct19-3" class="mt-0.5 rounded"> <span><strong>📊 5:00pm:</strong> HW-7 progress + CI formula review</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tue Oct 20 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Tue, Oct 20</span>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">CAMPUS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct20-1" class="mt-0.5 rounded"> <span><strong>📊 11:30am:</strong> STAT Lec (7.2–7.3 CIs & 8.1 Hyp Tests)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct20-2" class="mt-0.5 rounded"> <span><strong>💻 1pm & 2:30pm:</strong> CMSC 202 Lec (Inheritance) + Lab 8</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct20-3" class="mt-0.5 rounded"> <span><strong>📐 4pm & 6pm:</strong> MATH 251 Lec + Discussion Quiz</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wed Oct 21 -->
+        <div class="p-3 bg-indigo-50/60 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-indigo-950">Wed, Oct 21</span>
+              <span class="text-[10px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded">SUBMIT PROJ 3!</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct21-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Final Valgrind check & <strong>SUBMIT PROJ 3</strong> (6 days early!)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct21-2" class="mt-0.5 rounded"> <span><strong>📐 10:30am:</strong> Start daily 4-problem Midterm 2 drill</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct21-3" class="mt-0.5 rounded"> <span><strong>📊 1:00pm:</strong> Finish HW-7 & prep Quiz-7 (6.1–7.3)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thu Oct 22 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Thu, Oct 22</span>
+              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded">QUIZ-7 & HW-7</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct22-1" class="mt-0.5 rounded"> <span><strong>📊 STAT 355:</strong> Quiz-7 (6.1–7.3) + HW-7 Due + Lec 8.2–8.3</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct22-2" class="mt-0.5 rounded"> <span><strong>💻 2:15pm:</strong> Drill Overloaded Ops & Inheritance</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct22-3" class="mt-0.5 rounded"> <span><strong>📐 4:00pm:</strong> MATH 251 Lec + 4 exam probs</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fri Oct 23 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Fri, Oct 23</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PRELAB 9</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct23-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Prelab 9 Quiz + Exam 2 Wksht Part 2</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct23-2" class="mt-0.5 rounded"> <span><strong>📊 10:30am:</strong> Z-Test vs One-Sample t-Test drills</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct23-3" class="mt-0.5 rounded"> <span><strong>📐 1:00pm:</strong> Timed Calc 3 Midterm 2 section drill</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sat Oct 24 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sat, Oct 24</span>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">EXAM PREP</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct24-1" class="mt-0.5 rounded"> <span><strong>🔬 10:00am:</strong> Front-load iHARP tasks ahead of Nov 5</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct24-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Write Linked List & Inheritance code on paper</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct24-3" class="mt-0.5 rounded"> <span><strong>📊 3:00pm:</strong> Start STAT HW-8 (Ch. 7–8)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sun Oct 25 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sun, Oct 25</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">MOCK EXAMS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct25-1" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Full Blank Exam 2 Worksheet Run #1</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct25-2" class="mt-0.5 rounded"> <span><strong>📐 2:30pm:</strong> Full 50-Min MATH 251 Mock Midterm #1</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct25-3" class="mt-0.5 rounded"> <span><strong>📊 4:00pm:</strong> STAT 355 Ch. 5–8 Cumulative Drill</span></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= WEEK 4: OCT 26 – NOV 1 (1 WEEK BEFORE DOOMSDAY) ================= -->
+      <div class="bg-indigo-950 text-white px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider flex justify-between items-center">
+        <span>WEEK 4 (Course Week 10 — 1 WEEK OUT): Oct 26 – Nov 1 • Pre-Build 50% of Project 4 & Full Mock Exams</span>
+        <span class="font-mono-time text-rose-300">9 Days to Doomsday</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300 border-b-2 border-slate-300">
+        
+        <!-- Mon Oct 26 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Mon, Oct 26</span>
+              <span class="text-[10px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded">ADVISOR HEADS-UP</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct26-1" class="mt-0.5 rounded"> <span><strong>🔒 iHARP Mtgs:</strong> Let Prof. Xu & Dr. Josephine know Nov 5 has 3 midterms</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct26-2" class="mt-0.5 rounded"> <span><strong>📐 3:00pm:</strong> Calc 3 Tue Quiz prep + 4 exam probs</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tue Oct 27 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Tue, Oct 27</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PROJ 4 DROPS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct27-1" class="mt-0.5 rounded"> <span><strong>💻 CMSC 202:</strong> Proj 3 Official Due (Already done!) & Proj 4 Drops</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct27-2" class="mt-0.5 rounded"> <span><strong>📊/💻/📐:</strong> Attend all lectures, Lab 9 & Calc 3 Quiz</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct27-3" class="mt-0.5 rounded"> <span><strong>💻 7:00pm:</strong> 24-Hr Rule on Project 4</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wed Oct 28 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Wed, Oct 28</span>
+              <span class="text-[10px] font-bold bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded">PRE-BUILD P4</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct28-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Build 25% of Project 4 (base classes)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct28-2" class="mt-0.5 rounded"> <span><strong>📐 10:30am:</strong> Timed Calc 3 Practice Exam #2</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct28-3" class="mt-0.5 rounded"> <span><strong>📊 1:00pm:</strong> Finish HW-8 & prep Quiz-8 (Ch. 8)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thu Oct 29 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Thu, Oct 29</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">7 DAYS LEFT</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct29-1" class="mt-0.5 rounded"> <span><strong>📊 STAT 355:</strong> Quiz-8 & HW-8 + Finish Ch. 8</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct29-2" class="mt-0.5 rounded"> <span><strong>💻 2:15pm:</strong> Reach <strong>50% Project 4</strong> & freeze P4 until Nov 6!</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct29-3" class="mt-0.5 rounded"> <span><strong>📐 4:00pm:</strong> MATH 251 Lecture + Office Hours</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fri Oct 30 -->
+        <div class="p-3 bg-indigo-50/50 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Fri, Oct 30</span>
+              <span class="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded">202 REVIEW</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct30-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Prelab 10 Quiz + Blank Exam 2 Wksht #2</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct30-2" class="mt-0.5 rounded"> <span><strong>📊 10:30am:</strong> Full STAT 355 Mock Exam (Ch. 5–8)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct30-3" class="mt-0.5 rounded"> <span><strong>💻 2:00–4:00pm:</strong> Attend Optional Exam 2 Review (ITE 104)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sat Oct 31 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sat, Oct 31</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">SIMULATION</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct31-1" class="mt-0.5 rounded"> <span><strong>🔬 10:00am:</strong> Light 60m iHARP wrap-up</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct31-2" class="mt-0.5 rounded"> <span><strong>📐 1:00pm:</strong> Full 50-min Calc 3 Mock Exam #3 + patch</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-oct31-3" class="mt-0.5 rounded"> <span><strong>📊 3:00pm:</strong> Drill all missed HW 6–8 & Quiz 5–8 probs</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sun Nov 1 -->
+        <div class="p-3 bg-rose-50/40 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-rose-950">Sun, Nov 1</span>
+              <span class="text-[10px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded">DRESS REHEARSAL</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov1-1" class="mt-0.5 rounded"> <span><strong>📊 11:30am:</strong> 75m Timed STAT 355 Mock Exam</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov1-2" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> 75m Timed CMSC 202 Mock Exam</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov1-3" class="mt-0.5 rounded"> <span><strong>📐 4:00pm:</strong> 50m Timed MATH 251 Mock Exam (Exact Doomsday Times!)</span></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= WEEK 5: NOV 2 – NOV 8 (TRIPLE DOOMSDAY WEEK) ================= -->
+      <div class="bg-rose-700 text-white px-4 py-1.5 text-xs font-black uppercase tracking-wider flex justify-between items-center">
+        <span>🚨 WEEK 5 (Course Week 11 — TRIPLE DOOMSDAY WEEK): Nov 2 – Nov 8 • Execute & Score 90%+ (A)</span>
+        <span class="font-mono-time text-amber-200">SHOWTIME: THU, NOV 5</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 divide-y lg:divide-y-0 lg:divide-x divide-slate-300">
+        
+        <!-- Mon Nov 2 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Mon, Nov 2</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">3 DAYS LEFT</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov2-1" class="mt-0.5 rounded"> <span><strong>🔒 10am & 1:30pm:</strong> Quick iHARP status check-ins</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov2-2" class="mt-0.5 rounded"> <span><strong>📐 3:00pm:</strong> Patch Sunday's Mock Exam errors</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov2-3" class="mt-0.5 rounded"> <span><strong>📊/💻 5:00pm:</strong> Review missed Exam 1 + Wksht Qs</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tue Nov 3 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Tue, Nov 3</span>
+              <span class="text-[10px] font-bold bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded">2 DAYS LEFT</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov3-1" class="mt-0.5 rounded"> <span><strong>📊 11:30am:</strong> STAT 355 In-Class Exam 2 Review</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov3-2" class="mt-0.5 rounded"> <span><strong>💻 1pm & 2:30pm:</strong> CMSC 202 Lec + Lab 10</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov3-3" class="mt-0.5 rounded"> <span><strong>📐 4pm & 6pm:</strong> MATH 251 Lec + Discussion Review</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wed Nov 4 -->
+        <div class="p-3 bg-amber-50/50 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Wed, Nov 4</span>
+              <span class="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded">DOOMSDAY EVE</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov4-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> 90m C++ code-writing & tracing review</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov4-2" class="mt-0.5 rounded"> <span><strong>📐 10:30am:</strong> 90m Calc 3 formula & theorem recall</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov4-3" class="mt-0.5 rounded"> <span><strong>📊 1:00pm:</strong> 90m STAT 355 Ch. 5–8 final review</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov4-4" class="mt-0.5 rounded"> <span><strong>🌙 9:30pm:</strong> Pack calculator/pencils; sleep 8 hrs!</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thu Nov 5 (TRIPLE DOOMSDAY) -->
+        <div class="p-3 bg-rose-100 border-2 border-rose-600 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-rose-950">Thu, Nov 5</span>
+              <span class="text-[10px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded">🔥 DOOMSDAY</span>
+            </div>
+            <div class="space-y-1.5 text-xs font-semibold text-rose-950">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov5-1" class="mt-0.5 rounded"> <span><strong>11:30 AM:</strong> 📊 STAT 355 Exam 2 (PAH 132)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov5-2" class="mt-0.5 rounded"> <span><strong>1:00 PM:</strong> 💻 CMSC 202 Exam 2 (ITE 102)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov5-3" class="mt-0.5 rounded"> <span><strong>2:15–3:50 PM:</strong> Lunch + 45m Calc 3 Warm-Up</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov5-4" class="mt-0.5 rounded"> <span><strong>4:00 PM:</strong> 📐 MATH 251 Midterm 2 (PUP 105)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fri Nov 6 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Fri, Nov 6</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">PROJ 4 PIVOT</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov6-1" class="mt-0.5 rounded"> <span><strong>💻 9:00am:</strong> Prelab 11 Quiz + Resume Project 4 (already 50% built!)</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov6-2" class="mt-0.5 rounded"> <span><strong>🔬 3:00pm:</strong> Light iHARP research catch-up</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sat Nov 7 -->
+        <div class="p-3 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-slate-900">Sat, Nov 7</span>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">FINISH PROJ 4</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov7-1" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Complete remaining half of Project 4</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov7-2" class="mt-0.5 rounded"> <span><strong>💻 3:00pm:</strong> Full Valgrind & edge-case test suite</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sun Nov 8 -->
+        <div class="p-3 bg-emerald-50/40 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-black text-sm text-emerald-950">Sun, Nov 8</span>
+              <span class="text-[10px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded">SUBMIT PROJ 4!</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov8-1" class="mt-0.5 rounded"> <span><strong>💻 1:00pm:</strong> Submit Project 4 early (Due Nov 9–10)!</span></label>
+              <label class="flex items-start gap-1.5 cursor-pointer"><input type="checkbox" id="chk-nov8-2" class="mt-0.5 rounded"> <span><strong>🏆 Victory Rest:</strong> Doomsday + Proj 4 Conquered!</span></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SHEET 2 FOOTER: 4 NON-NEGOTIABLE RULES TO GUARANTEE AN "A" -->
+    <section class="print-avoid-break schedule-card bg-white rounded-2xl border-2 border-slate-300 shadow-sm p-5">
+      <h3 class="text-base font-black uppercase tracking-tight text-slate-900 mb-3 flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+        The 4 Non-Negotiable Rules to Guarantee an "A" on November 5
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200">
+          <div class="font-black text-indigo-950 text-sm mb-1">1. Finish Project 3 by Wed, Oct 21</div>
+          <p class="text-slate-700 leading-relaxed">
+            Project 3 is officially due Oct 27, and Project 4 is due Nov 9–10. Using Fall Break (Oct 12–13) to hit 75% and submitting Project 3 on <strong>Oct 21</strong> gives you two full weeks of uninterrupted Exam 2 prep and time to pre-build 50% of Project 4.
+          </p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+          <div class="font-black text-amber-950 text-sm mb-1">2. Zero-Notes / Zero-Calculator Calc 3</div>
+          <p class="text-slate-700 leading-relaxed">
+            Dr. Lee's MATH 251 Midterm 2 allows <strong>no books, notes, or calculators</strong> in 50 minutes. Every Wednesday, Friday, and Sunday MATH 251 block must be done on blank paper with your textbook closed so exam day feels automatic.
+          </p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+          <div class="font-black text-emerald-950 text-sm mb-1">3. Thursday 10:00 AM STAT 355 Lock-In</div>
+          <p class="text-slate-700 leading-relaxed">
+            STAT 355 quizzes (Quiz-5, Quiz-6, Quiz-7, Quiz-8) and Exam 2 happen in PAH 132. Use your Thursday 10:00–11:30 AM gap after Discussion every single week to drill confidence intervals and hypothesis test formulas with your calculator.
+          </p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-purple-50 border border-purple-200">
+          <div class="font-black text-purple-950 text-sm mb-1">4. Sunday Nov 1 Full Dress Rehearsal</div>
+          <p class="text-slate-700 leading-relaxed">
+            On <strong>Sunday, November 1</strong>, simulate the exact Thursday, Nov 5 stamina test: take a 75-min STAT 355 mock exam at 11:30 AM, a 75-min handwritten CMSC 202 mock exam at 1:00 PM, and a 50-min closed-book MATH 251 mock exam at 4:00 PM.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Filter weekly schedule blocks by course or locked status
+    function filterCourse(category) {
+      const blocks = document.querySelectorAll('.course-block');
+      const buttons = document.querySelectorAll('.filter-btn');
+
+      // Update active button state
+      buttons.forEach(btn => {
+        btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      });
+      const activeBtn = document.getElementById('btn-' + category);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      }
+
+      // Show or dim blocks
+      blocks.forEach(block => {
+        const tags = (block.getAttribute('data-course') || '').split(' ');
+        if (category === 'all' || tags.includes(category)) {
+          block.style.opacity = '1';
+          block.style.transform = 'scale(1)';
+          block.style.filter = 'none';
+        } else {
+          block.style.opacity = '0.22';
+          block.style.transform = 'scale(0.98)';
+          block.style.filter = 'grayscale(70%)';
         }
+      });
+    }
 
-        function renderCards(data) {
-            const grid = document.getElementById('catalogGrid');
-            const noResults = document.getElementById('noResults');
-            grid.innerHTML = '';
-
-            if (data.length === 0) {
-                grid.classList.add('hidden');
-                noResults.classList.remove('hidden');
-                return;
-            } else {
-                grid.classList.remove('hidden');
-                noResults.classList.add('hidden');
-            }
-
-            data.forEach(item => {
-                // Determine badge color based on category
-                let badgeColor = 'bg-slate-100 text-slate-800';
-                if (item.category === 'Computer Science') badgeColor = 'bg-blue-100 text-blue-800';
-                if (item.category === 'Earth Science') badgeColor = 'bg-sky-100 text-sky-800';
-                if (item.category === 'Data Science') badgeColor = 'bg-emerald-100 text-emerald-800';
-                if (item.category === 'Engineering') badgeColor = 'bg-purple-100 text-purple-800';
-
-                const cardHTML = `
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden card-hover flex flex-col h-full">
-                        <img src="${item.image_url}" alt="${item.title}" class="w-full h-48 object-cover border-b border-slate-200" onerror="this.src='https://placehold.co/600x400/e2e8f0/64748b?text=No+Image'">
-                        <div class="p-5 flex flex-col flex-grow">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}">
-                                    ${item.category}
-                                </span>
-                                <span class="text-sm font-semibold text-slate-500">${item.cost}</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-slate-900 mb-2 leading-tight">${item.title}</h3>
-                            <p class="text-sm text-slate-600 mb-4 flex-grow">${item.description}</p>
-                            <button class="w-full bg-slate-900 hover:bg-blue-600 text-white font-medium py-2 rounded-lg transition-colors text-sm">
-                                View Details
-                            </button>
-                        </div>
-                    </div>
-                `;
-                grid.innerHTML += cardHTML;
-            });
+    // Persist daily wall calendar checkboxes in localStorage
+    document.addEventListener('DOMContentLoaded', () => {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(box => {
+        const saved = localStorage.getItem('umbc_doomsday_' + box.id);
+        if (saved !== null) {
+          box.checked = saved === 'true';
         }
+        toggleStrike(box);
 
-        function filterCatalog() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const selectedCategory = document.getElementById('categoryFilter').value;
+        box.addEventListener('change', () => {
+          localStorage.setItem('umbc_doomsday_' + box.id, box.checked);
+          toggleStrike(box);
+        });
+      });
+    });
 
-            const filteredData = globalCatalogData.filter(item => {
-                const matchesSearch = item.title.toLowerCase().includes(searchTerm) || item.description.toLowerCase().includes(searchTerm);
-                const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-                return matchesSearch && matchesCategory;
-            });
+    function toggleStrike(checkbox) {
+      const span = checkbox.nextElementSibling;
+      if (!span) return;
+      if (checkbox.checked) {
+        span.classList.add('line-through', 'text-slate-400');
+      } else {
+        span.classList.remove('line-through', 'text-slate-400');
+      }
+    }
 
-            renderCards(filteredData);
+    function resetCheckboxes() {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(box => {
+        if (box.id !== 'chk-oct5-1') {
+          box.checked = false;
+          localStorage.removeItem('umbc_doomsday_' + box.id);
+          toggleStrike(box);
         }
-
-        document.getElementById('searchInput').addEventListener('input', filterCatalog);
-        document.getElementById('categoryFilter').addEventListener('change', filterCatalog);
-
-        // Initialize
-        window.onload = loadCatalogData;
-    </script>
+      });
+    }
+  </script>
 </body>
-</html>   
+</html>
